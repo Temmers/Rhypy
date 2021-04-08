@@ -1,6 +1,6 @@
 import pygame
 import sys
-from rhythm import Note
+from game import Note, Player
 from constants import WIDTH, HEIGHT, BLACK, WHITE, BLUE, GREEN, YELLOW, FPS
 
 
@@ -9,18 +9,26 @@ pygame.init()
 
 screen = pygame.display.set_mode([WIDTH, HEIGHT])
 clock = pygame.time.Clock()
+delta_time = 0
+
 game_over = False
 game_started = True
+p_color = WHITE
 
 current_time = 0
 button_press_time = 0
 q_button_time = 0
 
+player = Player()
+
 while not game_over:
 
     if game_started:
         game_started = False
-        Note.note_list.append(Note(BLUE, 1, current_time))
+        pygame.mixer.music.load('sounds/clap.wav')
+
+    pygame.mixer.music.rewind()
+    p_color = WHITE
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -30,44 +38,63 @@ while not game_over:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_q:
                 q_button_time = current_time
-                print(f'current time: {current_time}')
+                # print(f'current time: {current_time}')
+                # print(delta_time)
                 Note.note_list.append(Note(BLUE, 1, current_time))
 
-            if event.key == pygame.K_SPACE or event.key ==pygame. MOUSEBUTTONDOWN:
+            if event.key == pygame.K_SPACE or event.key == pygame.MOUSEBUTTONDOWN:
                 button_press_time = pygame.time.get_ticks()
-                print(f'current time: {button_press_time}')
+                # print(f'current time: {button_press_time}')
+
+                try:
+                    if Note.note_list[0]:
+                        hitPos = Note.note_list[0].pos[0]
+                except IndexError:
+                    hitPos = 0
+
+                def check_hit(notePos):
+                    if round(abs((player.pos[0]+(player.size[0]/2)) - notePos), 3) < 60:
+                        if round(abs((player.pos[0]+(player.size[0]/2)) - notePos), 3) < 30:
+                            if round(abs((player.pos[0]+(player.size[0]/2)) - notePos), 3) < 20:
+                                pygame.mixer.music.play()
+                                return 'Perfect!!'
+                            return 'Great!'
+                        return 'Okay'
+                    elif 52 < round(abs((player.pos[0]+(player.size[0]/2)) - notePos), 3) < 120:
+                        return 'Miss...'
+
+                print(round(player.pos[0]+(player.size[0]/2) - hitPos, 3))
+                print(check_hit(hitPos))
+                if (check_hit(hitPos)) != 'Miss...':
+                    p_color = BLUE
+
+                    
 
     screen.fill(BLACK)
 
-    pygame.draw.rect(screen, WHITE, pygame.Rect([WIDTH / 2 - 25, HEIGHT / 1.25 - 25], [50, 50]))
+    pygame.draw.rect(screen, p_color, pygame.Rect(player.pos, player.size))
 
-    for note in Note.note_list:
-        note.pos[0] -= ((WIDTH/2/note.speed)/FPS+note.speed/100)
-        pygame.draw.rect(screen, BLUE, pygame.Rect([note.pos[0], note.pos[1]], note.size))
-
-        if note.pos[0] < WIDTH/2-25:
-            Note.note_list.remove(note)
-
-#===============================================================================================
-#===============================================================================================
-
-#FIGURE OUT HOW TO MAKE THIS SHIT NOT MESS UP EVERY TIME THERE'S NO NOTES LEFT ON THE LIST
+    try:
+        for note in Note.note_list:
+            if note.pos[0] > player.pos[0] - 120:
+                note.pos[0] -= ((WIDTH/2/FPS*note.speed)+delta_time*2)*2
+            else:
+                Note.note_list.remove(note)
+            # print(round(note.pos[0], 5))
+            pygame.draw.rect(screen, BLUE, pygame.Rect([note.pos[0], note.pos[1]], note.size))
 
 
-#ALSO TRY TO ADD THE SHIT TO SEND A NOTE AT A CERTAIN BPM, AND ALSO CALIBRATION
+    except ZeroDivisionError:
+        print('There was a 0 Division error. If this is the first frame, ignore')
+        pass
 
-#===============================================================================================
-#===============================================================================================
-    if current_time - button_press_time < round(4000/FPS, 3):
-        if current_time > q_button_time + Note.note_list[-1].speed*1000 and abs(q_button_time + Note.note_list[-1].speed*1000 - button_press_time) < round(3000/FPS, 3):
-            screen.fill(GREEN)
-        elif current_time > q_button_time + Note.note_list[-1].speed*1000 and abs(q_button_time + Note.note_list[-1].speed*1000 - button_press_time) < round(6000/FPS, 3):
-            screen.fill(YELLOW)
-        else:
-            screen.fill(WHITE)
+    # except ValueError:
+    #     print('There was a value error... likely trying to delete something from the note list')
+
 
 
     current_time = pygame.time.get_ticks()
     pygame.display.flip()
+    delta_time = (clock.tick(FPS))/1000
     clock.tick(FPS)
     # print(current_time)
